@@ -1,0 +1,49 @@
+#!groovy
+
+pipeline {
+    agent {
+        docker {
+            image 'catrobat/catrobat-android:stable'
+            args '--device /dev/kvm:/dev/kvm -v /var/local/container_shared/gradle_cache/$EXECUTOR_NUMBER:/home/user/.gradle -m=6.5G'
+            label 'LimitedEmulator'
+            alwaysPull true
+        }
+    }
+
+    options {
+        timeout(time: 2, unit: 'HOURS')
+        timestamps()
+    }
+
+    stages {
+        stage('Prepare build') {
+            steps {
+                script {
+                    currentBuild.displayName = env.NAME
+                }
+            }
+        }
+
+        stage('Unit and Device tests') {
+            steps {
+                sh """./gradlew -PenableCoverage -Pemulator=${env.EMULATOR} startEmulator \
+                            createCatroidDebugAndroidTestCoverageReport -Pandroid.testInstrumentationRunnerArguments.${env.TYPE}=${env.NAME}"""
+            }
+
+            post {
+                always {
+                    junit '**/*TEST*.xml'
+
+                    sh './gradlew stopEmulator clearAvdStore'
+                    archiveArtifacts 'logcat.txt'
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            step([$class: 'LogParserPublisher', failBuildOnError: true, projectRulePath: 'buildScripts/log_parser_rules', unstableOnWarning: true, useProjectRule: true])
+        }
+    }
+}

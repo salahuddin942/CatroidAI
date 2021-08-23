@@ -1,0 +1,515 @@
+/*
+ * Catroid: An on-device visual programming system for Android devices
+ * Copyright (C) 2010-2021 The Catrobat Team
+ * (<http://developer.catrobat.org/credits>)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * An additional term exception under section 7 of the GNU Affero
+ * General Public License, version 3, is available at
+ * http://developer.catrobat.org/license_additional_term
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+buildscript {
+    repositories {
+        google()
+        jcenter()
+    }
+    dependencies {
+        classpath 'com.google.gms:google-services:4.3.2'
+    }
+}
+
+plugins {
+    id "io.gitlab.arturbosch.detekt" version "1.1.1"
+}
+
+repositories {
+    mavenLocal()
+    maven { url "https://jitpack.io" }
+}
+
+ext {
+    appId = 'org.catrobat.catroid'
+    appName = '@string/app_name'
+    manifestAppName = '@string/app_name'
+    manifestAppIcon = '@mipmap/ic_launcher'
+
+    projectVersion = "0.9"
+    gdxVersion = "1.9.10"
+    mockitoVersion = "2.8.47"
+    espressoVersion = "3.1.0"
+    playServicesVersion = "17.0.0"
+    cameraXVersion = "1.0.0-beta07"
+}
+
+apply plugin: 'com.android.application'
+apply plugin: 'kotlin-android'
+apply plugin: 'kotlin-kapt'
+
+apply from: 'gradle/code_quality_tasks.gradle'
+apply from: 'gradle/emulator_tasks.gradle'
+apply from: 'gradle/release_crowdin_tasks.gradle'
+apply from: 'gradle/release_fastlane_tasks.gradle'
+apply from: 'gradle/standalone_apk_tasks.gradle'
+apply from: 'gradle/setup_jacoco.gradle'
+
+if (rootProject.hasProperty('independent')) {
+    println "Independent build"
+    def today = new Date()
+    appId += '.independent_' + today.format('YYYYMMdd_HHmm')
+    appName = rootProject.property('independent') ?: 'Code ' + today.format('MMdd HH:mm')
+    manifestAppName = appName
+}
+
+if (!rootProject.hasProperty("signingKeystore")) {
+    ext.signingKeystore = "dummyKeystore"
+}
+
+ext.getProperty = { property, defaultValue ->
+    rootProject.hasProperty(property) ? rootProject.property(property) : defaultValue
+}
+
+ext.useAndroidLocales = { ->
+    rootProject.hasProperty('useAndroidLocales') ? 'true' : 'false'
+}
+
+ext.copyGoogleServicesFile = { flavorName, flavorId ->
+    copy {
+        from "google-services-template.json"
+        rename { "google-services.json" }
+        into "src/$flavorName"
+        filter { line ->
+            line.replaceAll('@appId@', flavorId)
+        }
+    }
+}
+
+def defaultVersionCode = 85
+def defaultVersionName = "1.0.3"
+
+android {
+    compileSdkVersion 29
+
+    buildFeatures {
+        viewBinding = true
+    }
+
+    defaultConfig {
+
+        minSdkVersion 23
+        targetSdkVersion 29
+        applicationId appId
+        testInstrumentationRunner 'org.catrobat.catroid.runner.UiTestApplicationRunner'
+        versionCode defaultVersionCode
+        versionName defaultVersionName
+        println "VersionCode is $versionCode"
+        println "VersionName is $versionName"
+        multiDexEnabled true
+        manifestPlaceholders += [appName: manifestAppName,
+                                 appIcon: manifestAppIcon,
+                                 intentFilterScheme: "https",
+                                 intentFilterHost: "share.catrob.at",
+                                 intentFilterPathPattern: "/.*/project/.*"]
+
+        buildConfigField "String", "GIT_COMMIT_INFO", "\"${getGitCommitInfo()}\""
+        buildConfigField "String", "WEB_TEST_URL", "\"" + project.getProperties().get('webTestUrl') + "\""
+        buildConfigField "boolean", "WEB_TEST_FLAG", (project.hasProperty('webTestUrl') ? 'true' :
+                'false')
+
+        buildConfigField "String", "PROJECT_NAME", "\"No Standalone Project\""
+        buildConfigField "String", "START_PROJECT", "\"No Starting Project\""
+
+        buildConfigField "boolean", "USE_ANDROID_LOCALES_FOR_SCREENSHOTS", "false"
+
+        buildConfigField "boolean", "FEATURE_AI_SENSORS_ENABLED", "true"
+        buildConfigField "boolean", "FEATURE_APK_GENERATOR_ENABLED", "false"
+        buildConfigField "boolean", "FEATURE_ARDUINO_ENABLED", "true"
+        buildConfigField "boolean", "FEATURE_CAST_ENABLED", "true"
+        buildConfigField "boolean", "FEATURE_EMBROIDERY_ENABLED", "true"
+        buildConfigField "boolean", "FEATURE_LEGO_NXT_ENABLED", "true"
+        buildConfigField "boolean", "FEATURE_LEGO_EV3_ENABLED", "true"
+        buildConfigField "boolean", "FEATURE_PARROT_AR_DRONE_ENABLED", "true"
+        buildConfigField "boolean", "FEATURE_PARROT_JUMPING_SUMO_ENABLED", "true"
+        buildConfigField "boolean", "FEATURE_PHIRO_ENABLED", "true"
+        buildConfigField "boolean", "FEATURE_MERGE_ENABLED", "true"
+        buildConfigField "boolean", "FEATURE_NFC_ENABLED", "true"
+        buildConfigField "boolean", "FEATURE_POCKETMUSIC_ENABLED", "true"
+        buildConfigField "boolean", "FEATURE_RASPI_ENABLED", "true"
+        buildConfigField "boolean", "FEATURE_SCRATCH_CONVERTER_ENABLED", "true"
+        buildConfigField "boolean", "FEATURE_USER_REPORTERS_ENABLED", "true"
+        buildConfigField "boolean", "FEATURE_MULTIPLAYER_VARIABLES_ENABLED", "true"
+        buildConfigField "boolean", "FEATURE_TESTBRICK_ENABLED", "true"
+        buildConfigField "boolean", "FEATURE_CATBLOCKS_ENABLED", "false"
+        buildConfigField "boolean", "FEATURE_CATBLOCKS_DEBUGABLE", "false"
+        resValue "string", "FEATURE_EMBROIDERY_PREFERENCES_ENABLED", "false"
+        resValue "string", "FEATURE_PHIRO_PREFERENCES_ENABLED", "false"
+        resValue "string", "FEATURE_MINDSTORMS_PREFERENCES_ENABLED", "false"
+        resValue "string", "FEATURE_AI_PREFERENCES_ENABLED", "false"
+        resValue "string", "SNACKBAR_HINTS_ENABLED", "false"
+        resValue "string", "DEBUG_MODE", "false"
+    }
+
+    lintOptions {
+        lintConfig file('config/lint.xml')
+        ignore 'GradleDependency', 'OldTargetApi', 'ExtraTranslation', 'MissingTranslation',
+                'LintBaseline', 'ObsoleteLintCustomCheck'
+
+        abortOnError false
+
+        textReport true
+        xmlReport true
+        htmlReport true
+        xmlOutput file("build/reports/lint-report.xml")
+        htmlOutput file("build/reports/lint-report.html")
+        baseline file('config/lint-baseline.xml')
+    }
+
+    testOptions {
+        unitTests.returnDefaultValues = true
+        unitTests.includeAndroidResources = true
+        unitTests.all {
+            jvmArgs '-Xmx2g'
+        }
+    }
+
+    sourceSets {
+        androidTest {
+            resources.srcDirs += ['src/androidTest/res', 'src/androidTest/assets']
+        }
+    }
+
+    dexOptions.javaMaxHeapSize "4g"
+
+    packagingOptions {
+        exclude 'LICENSE.txt'
+        exclude 'META-INF/maven/com.google.guava/guava/pom.properties'
+        exclude 'META-INF/maven/com.google.guava/guava/pom.xml'
+        exclude 'lib/mips/*'    // Mips devices are deprecated
+        exclude 'lib/armeabi/*' // armeabiv5 & v6 are deprecated
+    }
+
+    signingConfigs {
+        signedRelease {
+            // credentials loaded in release_task.gradle
+            storeFile file(project.getProperty("signingKeystore"))
+            storePassword ""
+            keyAlias ""
+            keyPassword ""
+        }
+
+        debug {
+            storeFile file("external/debug.keystore")
+            storePassword "android"
+            keyAlias "androiddebugkey"
+            keyPassword "android"
+        }
+    }
+
+    if (rootProject.hasProperty("signingKeystore") && rootProject.hasProperty("signingKeystorePassword") &&
+            rootProject.hasProperty("signingKeyAlias") && rootProject.hasProperty("signingKeyPassword")) {
+        android.signingConfigs.signedRelease {
+            storePassword = rootProject.property("signingKeystorePassword")
+            keyAlias = rootProject.property("signingKeyAlias")
+            keyPassword = rootProject.property("signingKeyPassword")
+        }
+    }
+
+    buildTypes {
+        debug {
+            buildConfigField "boolean", "USE_ANDROID_LOCALES_FOR_SCREENSHOTS", useAndroidLocales()
+            resValue "string", "DEBUG_MODE", "true"
+            buildConfigField "boolean", "FEATURE_CATBLOCKS_ENABLED", "true"
+            buildConfigField "boolean", "FEATURE_CATBLOCKS_DEBUGABLE", "true"
+            testCoverageEnabled = rootProject.hasProperty('enableCoverage')
+            signingConfig signingConfigs.debug
+        }
+
+        release {
+            buildConfigField "boolean", "FEATURE_MERGE_ENABLED", "false"
+            buildConfigField "boolean", "FEATURE_POCKETMUSIC_ENABLED", "false"
+            buildConfigField "boolean", "FEATURE_MULTIPLAYER_VARIABLES_ENABLED", "false"
+            buildConfigField "boolean", "FEATURE_USER_REPORTERS_ENABLED", "false"
+            resValue "string", "SNACKBAR_HINTS_ENABLED", "true"
+            signingConfig signingConfigs.debug
+        }
+
+        signedRelease {
+            initWith buildTypes.release
+            signingConfig signingConfigs.signedRelease
+        }
+    }
+
+    flavorDimensions "default"
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    productFlavors {
+        catroid {
+            isDefault.set(true)
+        }
+        createAtSchool {
+            applicationIdSuffix '.createatschool'
+        }
+        embroideryDesigner {
+            applicationIdSuffix '.embroiderydesigner'
+            resValue "string", "FEATURE_EMBROIDERY_PREFERENCES_ENABLED", "true"
+        }
+        lunaAndCat {
+            applicationIdSuffix '.lunaandcat'
+        }
+        phiro {
+            applicationIdSuffix '.phiro'
+            resValue "string", "FEATURE_PHIRO_PREFERENCES_ENABLED", "true"
+            resValue "string", "FEATURE_AI_PREFERENCES_ENABLED", "true"
+        }
+        pocketCodeBeta {
+            applicationIdSuffix '.test'
+            manifestPlaceholders.appName = "Pocket Code BETA-" + defaultVersionCode
+        }
+        mindstorms {
+            applicationIdSuffix '.mindstorms'
+            resValue "string", "FEATURE_MINDSTORMS_PREFERENCES_ENABLED", "true"
+            resValue "string", "FEATURE_AI_PREFERENCES_ENABLED", "true"
+        }
+        standalone {
+            if (!project.hasProperty('packageName')) {
+                applicationIdSuffix '.standalone'
+            }
+            versionCode 1
+            versionName '1.0'
+
+            buildConfigField "String", "START_PROJECT", "\"$projectId\""
+            buildConfigField "String", "PROJECT_NAME", "\"$appName\""
+            buildConfigField "boolean", "FEATURE_APK_GENERATOR_ENABLED", "true"
+        }
+    }
+
+    applicationVariants.all { variant ->
+        variant.outputs.all { output ->
+
+            if(variant.buildType.name == "signedRelease")
+            {
+                def flavorName
+                switch(variant.flavorName)
+                {
+                    case "catroid":
+                        flavorName = "pocketCode"
+                        break
+                    case "phiro":
+                        flavorName = "phiroCode"
+                        break
+                    default:
+                        flavorName = variant.flavorName
+                }
+                def versionName = variant.versionName
+                def buildType = variant.buildType.name
+                outputFileName = "catroid-${flavorName}-${versionName}-${buildType}.apk"
+            }
+        }
+    }
+    productFlavors.all { flavor ->
+        copyGoogleServicesFile(flavor.name, defaultConfig.applicationId + (flavor.applicationIdSuffix ?: ""))
+    }
+}
+
+configurations {
+    implementation.exclude group: 'xpp3' //compile problem with xstream
+    natives
+}
+
+dependencies {
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.0'
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+
+    // Paintroid local aar lib files
+    if(rootProject.hasProperty('paintroidLocal')) {
+        catroidImplementation "org.catrobat.paintroid:paintroid:-LOCAL"
+        implementation "org.catrobat.paintroid:colorpicker:-LOCAL"
+    } else {
+        implementation fileTree(dir: 'src/main/libs', include: ['*.aar'])
+    }
+    implementation 'com.nostra13.universalimageloader:universal-image-loader:1.9.5'
+
+    // Kotlin
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.3.8'
+
+    // Support libraries
+    implementation 'androidx.appcompat:appcompat:1.2.0'
+    implementation 'androidx.mediarouter:mediarouter:1.1.0'
+    implementation 'androidx.cardview:cardview:1.0.0'
+    implementation 'com.google.android.material:material:1.2.1'
+    implementation 'androidx.browser:browser:1.2.0'
+
+    implementation "androidx.test.espresso:espresso-idling-resource:$espressoVersion"
+    implementation 'androidx.multidex:multidex:2.0.1'
+
+    implementation ('com.opencsv:opencsv:5.0') {
+        exclude group: 'org.apache.commons', module: 'commons-text'
+        exclude group: 'commons-logging', module: 'commons-logging'
+    }
+
+    // Dependency Injection
+    implementation "org.koin:koin-core:$koin_version"
+    implementation "org.koin:koin-androidx-scope:$koin_version"
+    implementation "org.koin:koin-androidx-viewmodel:$koin_version"
+    implementation "org.koin:koin-androidx-fragment:$koin_version"
+
+    // Retrofit
+    implementation 'com.squareup.retrofit2:retrofit:2.9.0'
+    // retrofit moshi converter
+    implementation 'com.squareup.retrofit2:converter-moshi:2.7.1'
+    // Glide (Images downloader)
+    implementation 'com.github.bumptech.glide:glide:4.11.0'
+
+    // Shimmer effect
+    implementation 'com.facebook.shimmer:shimmer:0.5.0'
+
+    // Lifecycle
+    implementation "androidx.lifecycle:lifecycle-extensions:$lifecycle_version"
+    implementation "androidx.lifecycle:lifecycle-viewmodel-ktx:$lifecycle_version"
+    implementation "androidx.lifecycle:lifecycle-livedata-ktx:$lifecycle_version"
+
+    // CAST
+    implementation "com.google.android.gms:play-services-cast:$playServicesVersion"
+
+    // Analytics
+    implementation "com.google.android.gms:play-services-analytics:$playServicesVersion"
+
+    implementation 'com.google.guava:guava:28.2-android'
+    implementation 'com.google.code.gson:gson:2.8.0'
+
+    implementation 'com.koushikdutta.async:androidasync:2.2.1'
+    implementation 'com.squareup.picasso:picasso:2.71828'
+    implementation 'ar.com.hjg:pngj:2.1.0'
+
+    implementation ('com.thoughtworks.xstream:xstream:1.4.11.1') {
+        exclude group: 'xmlpull'
+    }
+
+    // Catblocks
+    implementation "androidx.webkit:webkit:1.2.0"
+
+    // Pocket Music
+    implementation 'com.github.oliewa92:MidiDroid:v1.1'
+    implementation 'com.github.billthefarmer:mididriver:v1.16'
+
+    // CameraX
+    implementation "androidx.camera:camera-camera2:$cameraXVersion"
+    implementation "androidx.camera:camera-lifecycle:${cameraXVersion}"
+
+    // ML Kit
+    implementation 'com.google.android.gms:play-services-mlkit-face-detection:16.1.4'
+    implementation 'com.google.android.gms:play-services-mlkit-text-recognition:16.1.3'
+    implementation 'com.google.mlkit:language-id:16.1.1'
+    implementation 'com.google.mlkit:pose-detection:17.0.0'
+    implementation 'com.google.mlkit:object-detection:16.2.3'
+    // libGDX
+    implementation "com.badlogicgames.gdx:gdx:$gdxVersion"
+    implementation "com.badlogicgames.gdx:gdx-backend-android:$gdxVersion"
+    implementation "com.badlogicgames.gdx:gdx-box2d:$gdxVersion"
+    natives "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-x86"
+    natives "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-x86_64"
+    natives "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-armeabi-v7a"
+    natives "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-arm64-v8a"
+    natives "com.badlogicgames.gdx:gdx-box2d-platform:$gdxVersion:natives-x86"
+    natives "com.badlogicgames.gdx:gdx-box2d-platform:$gdxVersion:natives-x86_64"
+    natives "com.badlogicgames.gdx:gdx-box2d-platform:$gdxVersion:natives-armeabi-v7a"
+    natives "com.badlogicgames.gdx:gdx-box2d-platform:$gdxVersion:natives-arm64-v8a"
+
+    implementation "com.google.android.gms:play-services-auth:$playServicesVersion"
+
+    androidTestImplementation('tools.fastlane:screengrab:1.2.0') {
+        // https://issuetracker.google.com/issues/123060356
+        exclude group: 'com.android.support.test.uiautomator', module: 'uiautomator-v18'
+    }
+    androidTestImplementation "androidx.test.espresso:espresso-web:$espressoVersion"
+
+    testImplementation 'junit:junit:4.12'
+    testImplementation "org.mockito:mockito-core:$mockitoVersion"
+    testImplementation 'org.hamcrest:hamcrest-library:1.3'
+
+    testImplementation 'org.powermock:powermock:1.6.6'
+    testImplementation 'org.powermock:powermock-module-junit4:2.0.0'
+    testImplementation 'org.powermock:powermock-api-mockito2:2.0.0'
+
+    testImplementation 'org.robolectric:robolectric:4.2.1'
+    testImplementation 'org.robolectric:shadows-multidex:4.2.1'
+
+    testImplementation 'org.reflections:reflections:0.9.11'
+    testImplementation 'org.json:json:20190722'
+
+    // Retrofit testing
+    androidTestImplementation 'com.squareup.okhttp3:mockwebserver:3.14.9'
+
+    // Koin for Unit tests
+    androidTestImplementation "org.koin:koin-test:$koin_version"
+
+    androidTestImplementation 'com.linkedin.dexmaker:dexmaker-mockito:2.2.0'
+    androidTestImplementation "org.mockito:mockito-core:$mockitoVersion"
+
+    androidTestImplementation 'androidx.test.ext:junit:1.1.1'
+    androidTestImplementation "androidx.test.espresso:espresso-core:$espressoVersion"
+    androidTestImplementation "androidx.test.espresso:espresso-contrib:$espressoVersion"
+    androidTestImplementation "androidx.test.espresso:espresso-intents:$espressoVersion"
+
+    androidTestImplementation 'androidx.test.uiautomator:uiautomator:2.2.0'
+
+}
+
+static def getGitCommitInfo() {
+    def hash = 'git rev-parse --short HEAD'.execute().text.trim()
+    def branch = 'git rev-parse --abbrev-ref HEAD'.execute().text.trim()
+
+    return "branch $branch @$hash"
+}
+
+project.gradle.taskGraph.whenReady {
+    connectedCatroidDebugAndroidTest.ignoreFailures = true
+}
+
+task copyAndroidNatives {
+    doFirst {
+        file("src/main/jniLibs/armeabi-v7a/").mkdirs()
+        file("src/main/jniLibs/arm64-v8a/").mkdirs()
+        file("src/main/jniLibs/x86_64/").mkdirs()
+        file("src/main/jniLibs/x86/").mkdirs()
+
+        configurations.natives.files.each { jar ->
+            def outputDir = null
+            if (jar.name.endsWith("natives-arm64-v8a.jar")) outputDir = file("src/main/jniLibs/arm64-v8a")
+            if (jar.name.endsWith("natives-armeabi-v7a.jar")) outputDir = file("src/main/jniLibs/armeabi-v7a")
+            if (jar.name.endsWith("natives-x86_64.jar")) outputDir = file("src/main/jniLibs/x86_64")
+            if (jar.name.endsWith("natives-x86.jar")) outputDir = file("src/main/jniLibs/x86")
+            if (outputDir != null) {
+                copy {
+                    from zipTree(jar)
+                    into outputDir
+                    include "*.so"
+                }
+            }
+        }
+    }
+}
+
+tasks.whenTaskAdded { packageTask ->
+    if (packageTask.name.contains("package")) {
+        packageTask.dependsOn 'copyAndroidNatives'
+    }
+}
+
+apply plugin: 'com.google.gms.google-services'
